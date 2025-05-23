@@ -2,7 +2,6 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { downloadRequestSchema } from "@shared/schema";
-import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
 import { promisify } from "util";
@@ -27,54 +26,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { url } = downloadRequestSchema.parse(req.body);
 
-      // Use yt-dlp to get video information
-      const ytDlpProcess = spawn('yt-dlp', [
-        '--dump-json',
-        '--no-download',
-        url
-      ]);
-
-      let output = '';
-      let error = '';
-
-      ytDlpProcess.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      ytDlpProcess.stderr.on('data', (data) => {
-        error += data.toString();
-      });
-
-      ytDlpProcess.on('close', (code) => {
-        if (code === 0) {
-          try {
-            const videoInfo = JSON.parse(output);
-            res.json({
-              success: true,
-              info: {
-                title: videoInfo.title || 'TikTok Video',
-                author: videoInfo.uploader || 'Unknown',
-                duration: videoInfo.duration ? formatDuration(videoInfo.duration) : '0:00',
-                thumbnail: videoInfo.thumbnail,
-                viewCount: videoInfo.view_count,
-                likeCount: videoInfo.like_count,
-              }
-            });
-          } catch (parseError) {
-            res.status(400).json({ 
-              success: false, 
-              error: 'Invalid video information received' 
-            });
-          }
-        } else {
-          res.status(400).json({ 
-            success: false, 
-            error: 'Failed to fetch video information. Please check the URL.' 
-          });
+      // Use RapidAPI to get video information
+      const encodedUrl = encodeURIComponent(url);
+      const apiUrl = `https://social-media-video-downloader.p.rapidapi.com/smvd/get/tiktok?url=${encodedUrl}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'social-media-video-downloader.p.rapidapi.com',
+          'x-rapidapi-key': '71c02bad3cmsha5e7e36928951c2p131773jsn1f13a647b5d2'
         }
       });
 
+      if (!response.ok) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Failed to fetch video information. Please check the URL.' 
+        });
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const videoData = data.data;
+        res.json({
+          success: true,
+          info: {
+            title: videoData.title || 'TikTok Video',
+            author: videoData.author || 'Unknown',
+            duration: videoData.duration ? formatDuration(videoData.duration) : '0:00',
+            thumbnail: videoData.thumbnail,
+            viewCount: videoData.play_count,
+            likeCount: videoData.digg_count,
+          }
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          error: 'Failed to fetch video information. Please check the URL.' 
+        });
+      }
+
     } catch (error) {
+      console.error('API validation error:', error);
       res.status(400).json({ 
         success: false, 
         error: 'Invalid request data' 
@@ -175,57 +169,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.updateDownload(downloadId, { status: 'processing' });
 
-      const outputPath = path.join(downloadsDir, `${downloadId}.%(ext)s`);
+      // Get video data from API
+      const encodedUrl = encodeURIComponent(url);
+      const apiUrl = `https://social-media-video-downloader.p.rapidapi.com/smvd/get/tiktok?url=${encodedUrl}`;
       
-      let ytDlpArgs = [
-        '-o', outputPath,
-        '--no-playlist'
-      ];
-
-      if (format === 'mp3') {
-        ytDlpArgs.push(
-          '--extract-audio',
-          '--audio-format', 'mp3',
-          '--audio-quality', '192K'
-        );
-      } else {
-        ytDlpArgs.push(
-          '-f', 'best[ext=mp4]'
-        );
-      }
-
-      ytDlpArgs.push(url);
-
-      const ytDlpProcess = spawn('yt-dlp', ytDlpArgs);
-
-      let error = '';
-      ytDlpProcess.stderr.on('data', (data) => {
-        error += data.toString();
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'social-media-video-downloader.p.rapidapi.com',
+          'x-rapidapi-key': '71c02bad3cmsha5e7e36928951c2p131773jsn1f13a647b5d2'
+        }
       });
 
-      ytDlpProcess.on('close', async (code) => {
-        if (code === 0) {
-          // Find the downloaded file
-          const extension = format === 'mp3' ? 'mp3' : 'mp4';
-          const finalPath = path.join(downloadsDir, `${downloadId}.${extension}`);
-          
-          try {
-            await access(finalPath);
-            const stats = fs.statSync(finalPath);
-            const fileSize = formatFileSize(stats.size);
+      if (!response.ok) {
+        await storage.updateDownload(downloadId, { status: 'failed' });
+        return;
+      }
 
-            await storage.updateDownload(downloadId, {
-              status: 'completed',
-              filePath: finalPath,
-              fileSize: fileSize
-            });
-          } catch (error) {
-            await storage.updateDownload(downloadId, { status: 'failed' });
-          }
-        } else {
-          console.error('yt-dlp error:', error);
-          await storage.updateDownload(downloadId, { status: 'failed' });
+      const data = await response.json();
+      
+      if (!data.success || !data.data) {
+        await storage.updateDownload(downloadId, { status: 'failed' });
+        return;
+      }
+
+      const videoData = data.data;
+      let downloadUrl: string;
+
+      // Get the appropriate download URL based on format
+      if (format === 'mp4') {
+        downloadUrl = videoData.video_hd || videoData.video || videoData.video_sd;
+      } else {
+        downloadUrl = videoData.music || videoData.video; // fallback to video if no audio
+      }
+
+      if (!downloadUrl) {
+        await storage.updateDownload(downloadId, { status: 'failed' });
+        return;
+      }
+
+      // Download the file
+      const fileResponse = await fetch(downloadUrl);
+      if (!fileResponse.ok) {
+        await storage.updateDownload(downloadId, { status: 'failed' });
+        return;
+      }
+
+      const extension = format === 'mp3' ? 'mp3' : 'mp4';
+      const finalPath = path.join(downloadsDir, `${downloadId}.${extension}`);
+      
+      const fileStream = fs.createWriteStream(finalPath);
+      const readableStream = fileResponse.body;
+      
+      if (!readableStream) {
+        await storage.updateDownload(downloadId, { status: 'failed' });
+        return;
+      }
+
+      // Convert ReadableStream to Node.js readable stream
+      const reader = readableStream.getReader();
+      
+      const pump = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fileStream.write(Buffer.from(value));
         }
+        fileStream.end();
+      };
+
+      await pump();
+
+      // Update download with metadata
+      const stats = fs.statSync(finalPath);
+      const fileSize = formatFileSize(stats.size);
+
+      await storage.updateDownload(downloadId, {
+        status: 'completed',
+        filePath: finalPath,
+        fileSize: fileSize,
+        title: videoData.title || 'TikTok Video',
+        author: videoData.author || 'Unknown',
+        duration: videoData.duration ? formatDuration(videoData.duration) : '0:00'
       });
 
     } catch (error) {
