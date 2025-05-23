@@ -21,77 +21,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('Downloads directory already exists or error creating:', error);
   }
 
-  // Validate TikTok URL and get video info
-  app.post("/api/validate", async (req, res) => {
-    try {
-      const { url } = req.body;
-      
-      // Simple URL validation
-      if (!url || typeof url !== 'string') {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'URL is required' 
-        });
-      }
-      
-      // Check if it's a TikTok URL
-      const tiktokRegex = /^https?:\/\/(www\.)?(tiktok\.com|vm\.tiktok\.com)/i;
-      if (!tiktokRegex.test(url)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Must be a valid TikTok URL' 
-        });
-      }
 
-      // Use RapidAPI to get video information
-      const encodedUrl = encodeURIComponent(url);
-      const apiUrl = `https://social-media-video-downloader.p.rapidapi.com/smvd/get/tiktok?url=${encodedUrl}`;
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'x-rapidapi-host': 'social-media-video-downloader.p.rapidapi.com',
-          'x-rapidapi-key': '71c02bad3cmsha5e7e36928951c2p131773jsn1f13a647b5d2'
-        }
-      });
-
-      if (!response.ok) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Failed to fetch video information. Please check the URL.' 
-        });
-      }
-
-      const data = await response.json();
-      
-      // If we have links, the API call was successful
-      if (data.links && Array.isArray(data.links) && data.links.length > 0) {
-        res.json({
-          success: true,
-          info: {
-            title: data.title || 'TikTok Video',
-            author: data.author || 'Unknown',
-            duration: data.duration ? formatDuration(data.duration) : '0:00',
-            thumbnail: data.thumbnail,
-            viewCount: data.view_count,
-            likeCount: data.like_count,
-          }
-        });
-      } else {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Failed to fetch video information. Please check the URL.' 
-        });
-      }
-
-    } catch (error) {
-      console.error('API validation error:', error);
-      res.status(400).json({ 
-        success: false, 
-        error: 'Invalid request data' 
-      });
-    }
-  });
 
   // Start download process
   app.post("/api/download", async (req, res) => {

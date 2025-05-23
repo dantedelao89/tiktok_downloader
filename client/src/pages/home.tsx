@@ -26,20 +26,11 @@ import {
   FileText
 } from "lucide-react";
 
-interface VideoInfo {
-  title: string;
-  author: string;
-  duration: string;
-  thumbnail?: string;
-  viewCount?: number;
-  likeCount?: number;
-}
+
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState<"mp4" | "mp3">("mp4");
-  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState("");
 
   const { 
@@ -52,7 +43,7 @@ export default function Home() {
     reset 
   } = useDownload();
 
-  const validateUrl = async () => {
+  const handleDownload = async () => {
     if (!url.trim()) {
       setValidationError("Please enter a TikTok URL");
       return;
@@ -64,40 +55,12 @@ export default function Home() {
       return;
     }
 
-    setIsValidating(true);
     setValidationError("");
-
-    try {
-      const response = await apiRequest("POST", "/api/validate", { url });
-      const data = await response.json();
-
-      if (data.success) {
-        setVideoInfo(data.info);
-        setValidationError("");
-      } else {
-        setValidationError(data.error || "Failed to validate URL");
-        setVideoInfo(null);
-      }
-    } catch (error) {
-      setValidationError("Failed to validate URL. Please try again.");
-      setVideoInfo(null);
-    } finally {
-      setIsValidating(false);
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!url.trim() || !videoInfo) {
-      await validateUrl();
-      if (!videoInfo) return;
-    }
-
     startDownload(url, format);
   };
 
   const handleNewDownload = () => {
     setUrl("");
-    setVideoInfo(null);
     setValidationError("");
     reset();
   };
@@ -187,7 +150,6 @@ export default function Home() {
                   onChange={(e) => {
                     setUrl(e.target.value);
                     setValidationError("");
-                    setVideoInfo(null);
                   }}
                   className="bg-slate-950 border-slate-700 text-white placeholder-slate-500 focus:border-pink-500"
                 />
@@ -282,96 +244,27 @@ export default function Home() {
                 </Card>
               </div>
 
-              {!videoInfo && (
-                <Button 
-                  onClick={validateUrl}
-                  disabled={!url.trim() || isValidating}
-                  className="w-full bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white"
-                >
-                  {isValidating ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                      Validating...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Validate URL
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {videoInfo && (
-                <Button 
-                  onClick={handleDownload}
-                  disabled={status === 'processing'}
-                  className="w-full bg-gradient-to-r from-pink-500 to-cyan-400 hover:from-pink-600 hover:to-cyan-500 text-white font-semibold transform hover:scale-[1.02] transition-all"
-                >
-                  {status === 'processing' ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Now
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button 
+                onClick={handleDownload}
+                disabled={!url.trim() || status === 'processing'}
+                className="w-full bg-gradient-to-r from-pink-500 to-cyan-400 hover:from-pink-600 hover:to-cyan-500 text-white font-semibold transform hover:scale-[1.02] transition-all"
+              >
+                {status === 'processing' ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download {format.toUpperCase()}
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Video Preview */}
-          {videoInfo && (
-            <Card className="bg-slate-900 border-slate-800 shadow-2xl mb-8">
-              <CardHeader>
-                <CardTitle className="text-white">Video Preview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-4 p-4 bg-slate-950 rounded-2xl">
-                  <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-cyan-400 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Play className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-white truncate">{videoInfo.title}</h4>
-                    <p className="text-sm text-slate-400 flex items-center">
-                      <User className="w-3 h-3 mr-1" />
-                      {videoInfo.author}
-                    </p>
-                    <div className="flex items-center space-x-4 text-xs text-slate-500 mt-1">
-                      <span className="flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {videoInfo.duration}
-                      </span>
-                      {videoInfo.viewCount && (
-                        <span className="flex items-center">
-                          <Eye className="w-3 h-3 mr-1" />
-                          {formatNumber(videoInfo.viewCount)}
-                        </span>
-                      )}
-                      {videoInfo.likeCount && (
-                        <span className="flex items-center">
-                          <Heart className="w-3 h-3 mr-1" />
-                          {formatNumber(videoInfo.likeCount)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge 
-                      variant="outline" 
-                      className={format === 'mp4' ? 'border-pink-500 text-pink-400' : 'border-cyan-400 text-cyan-400'}
-                    >
-                      {format.toUpperCase()}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+
 
           {/* Download Progress */}
           {status === 'processing' && (
