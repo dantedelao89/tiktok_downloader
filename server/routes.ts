@@ -24,7 +24,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Validate TikTok URL and get video info
   app.post("/api/validate", async (req, res) => {
     try {
-      const { url } = downloadRequestSchema.parse(req.body);
+      const { url } = req.body;
+      
+      // Simple URL validation
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'URL is required' 
+        });
+      }
+      
+      // Check if it's a TikTok URL
+      const tiktokRegex = /^https?:\/\/(www\.)?(tiktok\.com|vm\.tiktok\.com)/i;
+      if (!tiktokRegex.test(url)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Must be a valid TikTok URL' 
+        });
+      }
 
       // Use RapidAPI to get video information
       const encodedUrl = encodeURIComponent(url);
