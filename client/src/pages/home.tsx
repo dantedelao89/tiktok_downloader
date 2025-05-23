@@ -379,25 +379,71 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-pink-500 border-t-transparent mr-2" />
-                  Processing Your Download
+                  {progress < 20 ? 'Initializing Download...' : 
+                   progress < 60 ? 'Downloading Video...' : 
+                   progress < 90 ? 'Processing File...' : 
+                   'Finalizing...'}
                 </CardTitle>
-                <p className="text-slate-400">Please wait while we prepare your file...</p>
+                <p className="text-slate-400">
+                  {progress < 20 ? 'Getting video information and preparing download' : 
+                   progress < 60 ? 'Downloading video content from TikTok servers' : 
+                   progress < 90 ? 'Converting and optimizing your file' : 
+                   'Almost done! Preparing your download'}
+                </p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">Progress</span>
-                    <span className="text-white font-semibold">{progress}%</span>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-400 flex items-center">
+                      {progress < 20 ? <Clock className="w-4 h-4 mr-1" /> : 
+                       progress < 60 ? <Download className="w-4 h-4 mr-1" /> : 
+                       progress < 90 ? <Zap className="w-4 h-4 mr-1" /> : 
+                       <CheckCircle className="w-4 h-4 mr-1" />}
+                      Progress
+                    </span>
+                    <span className="text-white font-bold text-lg">{Math.round(progress)}%</span>
                   </div>
-                  <Progress value={progress} className="h-3" />
+                  <Progress value={progress} className="h-4" />
+                  
+                  {/* Progress Steps */}
+                  <div className="grid grid-cols-4 gap-2 mt-4">
+                    <div className={`text-center p-2 rounded-lg transition-all ${
+                      progress >= 20 ? 'bg-pink-500/20 text-pink-400' : 'bg-slate-800 text-slate-500'
+                    }`}>
+                      <div className="text-xs font-medium">Initialize</div>
+                    </div>
+                    <div className={`text-center p-2 rounded-lg transition-all ${
+                      progress >= 60 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-500'
+                    }`}>
+                      <div className="text-xs font-medium">Download</div>
+                    </div>
+                    <div className={`text-center p-2 rounded-lg transition-all ${
+                      progress >= 90 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-800 text-slate-500'
+                    }`}>
+                      <div className="text-xs font-medium">Process</div>
+                    </div>
+                    <div className={`text-center p-2 rounded-lg transition-all ${
+                      progress >= 100 ? 'bg-green-500/20 text-green-400' : 'bg-slate-800 text-slate-500'
+                    }`}>
+                      <div className="text-xs font-medium">Complete</div>
+                    </div>
+                  </div>
                 </div>
-                <Button 
-                  onClick={reset}
-                  variant="outline"
-                  className="w-full border-slate-600 text-slate-300 hover:bg-slate-800"
-                >
-                  Cancel Download
-                </Button>
+                
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={reset}
+                    variant="outline"
+                    className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <div className="flex-1 bg-slate-800 rounded-lg p-3 text-center">
+                    <div className="text-xs text-slate-400">Format</div>
+                    <div className="text-sm font-semibold text-white">{format.toUpperCase()}</div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
