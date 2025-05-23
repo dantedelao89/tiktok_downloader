@@ -46,6 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const data = await response.json();
+      console.log('API Response:', JSON.stringify(data, null, 2));
       
       if (data.success && data.data) {
         const videoData = data.data;
@@ -53,17 +54,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: true,
           info: {
             title: videoData.title || 'TikTok Video',
-            author: videoData.author || 'Unknown',
+            author: videoData.author || videoData.username || 'Unknown',
             duration: videoData.duration ? formatDuration(videoData.duration) : '0:00',
-            thumbnail: videoData.thumbnail,
-            viewCount: videoData.play_count,
-            likeCount: videoData.digg_count,
+            thumbnail: videoData.thumbnail || videoData.cover,
+            viewCount: videoData.play_count || videoData.view_count,
+            likeCount: videoData.digg_count || videoData.like_count,
           }
         });
       } else {
+        console.log('API Error Response:', data);
         res.status(400).json({ 
           success: false, 
-          error: 'Failed to fetch video information. Please check the URL.' 
+          error: data.message || 'Failed to fetch video information. Please check the URL.' 
         });
       }
 
