@@ -65,16 +65,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = await response.json();
       console.log('API Response:', JSON.stringify(data, null, 2));
       
-      if (data.success) {
+      // If we have links, the API call was successful
+      if (data.links && data.links.length > 0) {
         res.json({
           success: true,
           info: {
             title: data.title || 'TikTok Video',
-            author: data.author?.authorName || data.authorName || 'Unknown',
+            author: data.author || 'Unknown',
             duration: data.duration ? formatDuration(data.duration) : '0:00',
-            thumbnail: data.coverMedium || data.coverLarge || data.coverThumb,
-            viewCount: data.stats?.playCount,
-            likeCount: data.stats?.diggCount,
+            thumbnail: data.thumbnail,
+            viewCount: data.view_count,
+            likeCount: data.like_count,
           }
         });
       } else {
@@ -206,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = await response.json();
       
-      if (!data.success || !data.data) {
+      if (!data.success || !data.links || data.links.length === 0) {
         await storage.updateDownload(downloadId, { status: 'failed' });
         return;
       }
@@ -215,11 +216,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get the appropriate download URL based on format
       if (format === 'mp4') {
-        // For video, try different quality options
-        downloadUrl = data.video_hd || data.video || data.video_sd;
+        // For video, find the best quality video link
+        const videoLink = data.links.find(link => 
+          link.quality === 'video_hd_original' || 
+          link.quality === 'video_hd' || 
+          link.quality.includes('video')
+        );
+        downloadUrl = videoLink?.link;
       } else {
-        // For audio/MP3, use the music URL
-        downloadUrl = data.music?.playUrl || data.video_hd || data.video;
+        // For audio/MP3, find the audio link
+        const audioLink = data.links.find(link => link.quality === 'audio');
+        downloadUrl = audioLink?.link || audioLink?.renderLink;
       }
 
       if (!downloadUrl) {
@@ -267,9 +274,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'completed',
         filePath: finalPath,
         fileSize: fileSize,
-        title: videoData.title || 'TikTok Video',
-        author: videoData.author || 'Unknown',
-        duration: videoData.duration ? formatDuration(videoData.duration) : '0:00'
+        title: data.title || 'TikTok Video',
+        author: data.author || 'Unknown',
+        duration: data.duration ? formatDuration(data.duration) : '0:00'
       });
 
     } catch (error) {
