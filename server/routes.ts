@@ -63,10 +63,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const data = await response.json();
-      console.log('API Response:', JSON.stringify(data, null, 2));
+      console.log('API Response received, checking structure...');
+      console.log('Has links?', !!data.links);
+      console.log('Links length:', data.links ? data.links.length : 0);
+      console.log('Title:', data.title);
+      console.log('Author:', data.author);
       
       // If we have links, the API call was successful
-      if (data.links && data.links.length > 0) {
+      if (data.links && Array.isArray(data.links) && data.links.length > 0) {
+        console.log('✅ Success! Returning video info...');
         res.json({
           success: true,
           info: {
@@ -79,7 +84,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
       } else {
-        console.log('API Error Response:', data);
+        console.log('❌ No links found in response');
+        console.log('Full response keys:', Object.keys(data));
         res.status(400).json({ 
           success: false, 
           error: data.message || 'Failed to fetch video information. Please check the URL.' 
