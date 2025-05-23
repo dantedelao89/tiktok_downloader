@@ -58,11 +58,30 @@ export function useDownload() {
             error: 'Download failed. Please try again.'
           }));
         } else if (download.status === 'processing') {
-          // Simulate progress for better UX
-          setState(prev => ({ 
-            ...prev, 
-            progress: Math.min(prev.progress + Math.random() * 15, 95)
-          }));
+          // Simulate realistic progress for better UX
+          setState(prev => {
+            let newProgress = prev.progress;
+            
+            // Simulate different phases of download
+            if (newProgress < 20) {
+              // Initial phase: getting video info
+              newProgress += Math.random() * 8 + 2;
+            } else if (newProgress < 60) {
+              // Download phase: steady progress
+              newProgress += Math.random() * 12 + 3;
+            } else if (newProgress < 90) {
+              // Processing phase: slower progress
+              newProgress += Math.random() * 5 + 1;
+            } else {
+              // Final phase: very slow to avoid reaching 100%
+              newProgress += Math.random() * 2;
+            }
+            
+            return { 
+              ...prev, 
+              progress: Math.min(newProgress, 95)
+            };
+          });
         }
       }
     } catch (error) {
