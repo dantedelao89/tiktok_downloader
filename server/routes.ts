@@ -65,17 +65,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = await response.json();
       console.log('API Response:', JSON.stringify(data, null, 2));
       
-      if (data.success && data.data) {
-        const videoData = data.data;
+      if (data.success) {
         res.json({
           success: true,
           info: {
-            title: videoData.title || 'TikTok Video',
-            author: videoData.author || videoData.username || 'Unknown',
-            duration: videoData.duration ? formatDuration(videoData.duration) : '0:00',
-            thumbnail: videoData.thumbnail || videoData.cover,
-            viewCount: videoData.play_count || videoData.view_count,
-            likeCount: videoData.digg_count || videoData.like_count,
+            title: data.title || 'TikTok Video',
+            author: data.author?.authorName || data.authorName || 'Unknown',
+            duration: data.duration ? formatDuration(data.duration) : '0:00',
+            thumbnail: data.coverMedium || data.coverLarge || data.coverThumb,
+            viewCount: data.stats?.playCount,
+            likeCount: data.stats?.diggCount,
           }
         });
       } else {
@@ -212,14 +211,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const videoData = data.data;
       let downloadUrl: string;
 
       // Get the appropriate download URL based on format
       if (format === 'mp4') {
-        downloadUrl = videoData.video_hd || videoData.video || videoData.video_sd;
+        // For video, try different quality options
+        downloadUrl = data.video_hd || data.video || data.video_sd;
       } else {
-        downloadUrl = videoData.music || videoData.video; // fallback to video if no audio
+        // For audio/MP3, use the music URL
+        downloadUrl = data.music?.playUrl || data.video_hd || data.video;
       }
 
       if (!downloadUrl) {
